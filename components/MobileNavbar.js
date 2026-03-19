@@ -71,7 +71,7 @@ export default function MobileNavbar({
         }
 
         .nav-item.active {
-          color: #3b82f6;
+          color: #ef4444;
         }
 
         .nav-icon {
