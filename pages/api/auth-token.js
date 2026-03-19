@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     const token = jwt.sign(
       { 
         videoUrl,
-        exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 soat
+       exp: Math.floor(Date.now() / 1000) + (60 * 60 * 3) // ✅ 3 soat
       },
       JWT_SECRET
     );
