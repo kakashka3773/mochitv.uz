@@ -499,7 +499,7 @@ function TelegramCodeModal({ onClose, onVerify, onStart, loading, errorText }) {
 
         <button
           className="google-auth-btn"
-          style={{ background: '#2AABEE', color: '#fff' }}
+          style={{ background: 'none', color: '#fff' }}
           onClick={onStart}
           disabled={loading}
         >
@@ -1723,7 +1723,7 @@ const goToAnime = (anime) => {
         }
         .carousel-watch-btn {
           align-self: flex-start;
-          background: #3b82f6;
+          background: #eab308;
           border: none;
           color: #fff;
           padding: 12px 28px;
@@ -1735,12 +1735,10 @@ const goToAnime = (anime) => {
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
         }
         .carousel-watch-btn:hover {
-          background: #2563eb;
+          background: #eab308;
           transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(59, 130, 246, 0.6);
         }
         .carousel-poster-section {
           flex: 0 0 320px;
@@ -2103,14 +2101,14 @@ const goToAnime = (anime) => {
         }
         .auth-input:focus {
           outline: none;
-          border-color: #3b82f6;
+          border-color: #eab308;
           background: rgba(255, 255, 255, 0.08);
         }
 
         .auth-submit-btn {
           width: 100%;
           padding: 14px;
-          background: linear-gradient(135deg, #3b82f6, #2563eb);
+          background: #eab308;
           border: none;
           color: #fff;
           border-radius: 8px;
@@ -2124,7 +2122,7 @@ const goToAnime = (anime) => {
           justify-content: center;
           gap: 8px;
         }
-        .auth-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4); }
+        .auth-submit-btn:hover { transform: translateY(-2px);  }
         .auth-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .auth-switch {
@@ -2133,7 +2131,7 @@ const goToAnime = (anime) => {
           font-size: 14px;
           color: rgba(255, 255, 255, 0.6);
         }
-        .auth-switch-link { color: #3b82f6; cursor: pointer; font-weight: 600; transition: color 0.3s; }
+        .auth-switch-link { color: #fff; cursor: pointer; font-weight: 600; transition: color 0.3s; }
         .auth-switch-link:hover { color: #2563eb; }
 
         .auth-close-btn {
