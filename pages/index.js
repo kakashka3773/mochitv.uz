@@ -1493,23 +1493,21 @@ const goToAnime = (anime) => {
           overflow: hidden;
         }
         .news-action-btn {
-          background: linear-gradient(90deg, #6200EE 0%, #B819D2 100%);
           color: #fff;
           text-decoration: none;
           padding: 12px;
           border-radius: 12px;
           text-align: center;
+          border: 1px solid;
           font-weight: 600;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
           transition: transform 0.3s;
-          box-shadow: 0 4px 15px rgba(184, 25, 210, 0.4);
         }
         .news-action-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(184, 25, 210, 0.6);
         }
 
         /* --- MAIN STYLES --- */
@@ -1530,7 +1528,7 @@ const goToAnime = (anime) => {
           font-size: 24px;
           font-weight: 700;
           color: #fff;
-          border-left: 4px solid #3b82f6;
+          border-left: 4px solid #ef4444;
           padding-left: 12px;
         }
         .horizontal-scroll-container {
@@ -1577,9 +1575,9 @@ const goToAnime = (anime) => {
           transition: all 0.3s;
         }
         .login-btn {
-          background: rgba(59, 130, 246, 0.2);
-          border: 1px solid rgba(59, 130, 246, 0.5);
-          color: #3b82f6;
+          background: none;
+          border: 1px solid #ef4444;
+          color: white;
           padding: 10px 20px;
           border-radius: 8px;
           cursor: pointer;
@@ -1709,8 +1707,7 @@ const goToAnime = (anime) => {
           border-radius: 50px;
           font-size: 13px;
           font-weight: 600;
-          border: 1px solid rgba(59, 130, 246, 0.4);
-          color: #60a5fa;
+          border: 1px solid #ef4444;
           backdrop-filter: blur(5px);
         }
         .carousel-description {
@@ -1781,7 +1778,7 @@ const goToAnime = (anime) => {
           transition: all 0.3s;
         }
         .carousel-dot.active {
-          background: #3b82f6;
+          background: #ef4444;
           width: 30px;
           border-radius: 5px;
         }
@@ -2002,10 +1999,10 @@ const goToAnime = (anime) => {
         }
 
         .footer {
-          background: rgba(0, 0, 0, 0.95);
           border-top: 1px solid rgba(255, 255, 255, 0.1);
           padding: 40px 20px;
           position: relative;
+          border-radius:30px;
         }
         .footer-content { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
         .footer-section { display: grid; grid-template-columns: repeat(3, 1fr); justify-content: center; }
