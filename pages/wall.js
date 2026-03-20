@@ -1,7 +1,18 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import { Search, Download, Share2, X, Check, Image as ImageIcon } from 'lucide-react';
 import MobileNavbar from '../components/MobileNavbar';
+
+// Rasm o'lchamlarini oldindan belgilash orqali sakrashni (layout shift) yo'q qilamiz
+const getDeterministicHeight = (id) => {
+  const heights =[240, 320, 280, 380, 260, 340, 400];
+  const stringId = String(id || '1');
+  let hash = 0;
+  for (let i = 0; i < stringId.length; i++) {
+    hash = stringId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return heights[Math.abs(hash) % heights.length];
+};
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -23,7 +34,7 @@ function getColCount() {
 }
 
 function buildColumns(items, colCount) {
-  const cols = Array.from({ length: colCount }, () => []);
+  const cols = Array.from({ length: colCount }, () =>[]);
   items.forEach((item, i) => cols[i % colCount].push(item));
   return cols;
 }
@@ -32,31 +43,41 @@ const LOGO_URL = '/assets/lego.png';
 
 export default function Wallpapers() {
   const [allWallpapers, setAllWallpapers]           = useState([]);
-  const [filteredWallpapers, setFilteredWallpapers] = useState([]);
+  const[filteredWallpapers, setFilteredWallpapers] = useState([]);
   const [wallpapers, setWallpapers]                 = useState([]);
-  const [colCount, setColCount]                     = useState(getColCount);
+  const [colCount, setColCount]                     = useState(2);
   const [loading, setLoading]                       = useState(true);
   const [searchQuery, setSearchQuery]               = useState('');
-  const [debouncedQuery, setDebouncedQuery]         = useState('');
+  const[debouncedQuery, setDebouncedQuery]         = useState('');
   const [offset, setOffset]                         = useState(0);
   const [hasMore, setHasMore]                       = useState(true);
-  const [selectedImage, setSelectedImage]           = useState(null);
+  const[selectedImage, setSelectedImage]           = useState(null);
   const [toast, setToast]                           = useState({ show: false, message: '', type: 'success' });
   const [currentUser, setCurrentUser]               = useState(null);
   const [downloading, setDownloading]               = useState(false);
 
   const shuffledRef = useRef([]);
+  const observerTarget = useRef(null);
 
+  // Client-side oynani o'lchash
   useEffect(() => {
+    setColCount(getColCount());
     const onResize = () => setColCount(getColCount());
-    window.addEventListener('resize', onResize);
+    window.addEventListener('resize', onResize, { passive: true });
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  },[]);
+
+  // Modal ochiq qolganda scroll bloklanishining oldini olish uchun tozalash
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+    };
+  },[]);
 
   useEffect(() => {
     const user = localStorage.getItem('anime_user');
     if (user) setCurrentUser(JSON.parse(user));
-  }, []);
+  },[]);
 
   useEffect(() => {
     const fetchWallpapers = async () => {
@@ -65,7 +86,7 @@ export default function Wallpapers() {
         const res = await fetch('/api/get-wall');
         if (!res.ok) throw new Error('Xatolik');
         const data = await res.json();
-        const shuffled = shuffleArray(data || []);
+        const shuffled = shuffleArray(data ||[]);
         shuffledRef.current = shuffled;
         setAllWallpapers(shuffled);
       } catch (error) {
@@ -75,7 +96,7 @@ export default function Wallpapers() {
       }
     };
     fetchWallpapers();
-  }, []);
+  },[]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 400);
@@ -97,7 +118,7 @@ export default function Wallpapers() {
     setWallpapers(filtered.slice(0, 30));
     setOffset(30);
     setHasMore(filtered.length > 30);
-  }, [debouncedQuery, allWallpapers]);
+  },[debouncedQuery, allWallpapers]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -106,25 +127,33 @@ export default function Wallpapers() {
       const target = allWallpapers.find(w => w.id.toString() === sharedId);
       if (target) openModal(target, false);
     }
-  }, [allWallpapers]);
+  },[allWallpapers]);
 
   const loadMore = useCallback(() => {
-    if (!hasMore) return;
+    if (!hasMore || loading) return;
     const nextBatch = filteredWallpapers.slice(offset, offset + 30);
     setWallpapers(prev => [...prev, ...nextBatch]);
     setOffset(prev => prev + 30);
     if (offset + 30 >= filteredWallpapers.length) setHasMore(false);
-  }, [hasMore, offset, filteredWallpapers]);
+  }, [hasMore, offset, filteredWallpapers, loading]);
 
-  const observer = useRef();
-  const lastElementRef = useCallback(node => {
-    if (loading) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) loadMore();
-    }, { rootMargin: '800px' });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore, loadMore]);
+  // Infinite Scroll uchun ishonchli observer (ohirgi rasmga emas, maxsus trigger'ga ulanadi)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          loadMore();
+        }
+      },
+      { rootMargin: '600px' } // Sal oldinroq yuklashni boshlaydi
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadMore, hasMore]);
 
   const openModal = (img, updateUrl = true) => {
     setSelectedImage(img);
@@ -135,7 +164,7 @@ export default function Wallpapers() {
   const closeModal = () => {
     setSelectedImage(null);
     window.history.pushState({}, '', '/wall');
-    document.body.style.overflow = 'auto';
+    document.body.style.overflow = '';
   };
 
   const showToast = (message, type = 'success') => {
@@ -168,7 +197,7 @@ export default function Wallpapers() {
       return r.blob();
     };
 
-    const proxies = [
+    const proxies =[
       `https://api.allorigins.win/raw?url=${encodeURIComponent(img.image_url)}`,
       `https://corsproxy.io/?${encodeURIComponent(img.image_url)}`,
     ];
@@ -198,11 +227,8 @@ export default function Wallpapers() {
     setDownloading(false);
   };
 
-  const columns = buildColumns(wallpapers, colCount);
-  const totalItems = wallpapers.length;
-  // Oxirgi ustun, oxirgi element — shu yerda scroll trigger
-  const lastColIdx = columns.length - 1;
-  const lastRowIdx = columns[lastColIdx] ? columns[lastColIdx].length - 1 : -1;
+  // React qotmasligi uchun columnlarni memoization qildik
+  const columns = useMemo(() => buildColumns(wallpapers, colCount), [wallpapers, colCount]);
 
   return (
     <>
@@ -219,16 +245,15 @@ export default function Wallpapers() {
         html, body {
           width: 100%; min-height: 100%;
           background: #090b10; color: #fff;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-            "Helvetica Neue", Arial, sans-serif;
-          overscroll-behavior-y: none;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          /* Scroll muammosini tuzatish */
           overflow-x: hidden;
+          overscroll-behavior-y: auto; 
         }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.6); border-radius: 10px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
 
-        /* ─── background — index.js ile aynı ─── */
         .bg-grid {
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
           background-image:
@@ -244,10 +269,8 @@ export default function Wallpapers() {
             linear-gradient(to top, #090b10 0%, transparent 100%);
         }
 
-        /* ─── container ─── */
-        .w-container { position: relative; z-index: 1; padding-bottom: 100px; }
+        .w-container { position: relative; z-index: 1; padding-bottom: 120px; }
 
-        /* ─── header ─── */
         .w-header {
           position: sticky; top: 0; z-index: 100;
           padding: 11px 20px;
@@ -283,7 +306,6 @@ export default function Wallpapers() {
         }
         .w-clear-btn:hover { background: rgba(239,68,68,0.2); color: #ef4444; }
 
-        /* ─── info bar ─── */
         .w-infobar {
           max-width: 1800px; margin: 0 auto;
           padding: 16px 20px 0;
@@ -295,7 +317,6 @@ export default function Wallpapers() {
         }
         .w-count-label b { color: rgba(255,255,255,0.8); font-weight: 700; }
 
-        /* ─── masonry ─── */
         .masonry-wrapper {
           display: flex; gap: 14px;
           padding: 16px 20px; max-width: 1800px;
@@ -308,31 +329,39 @@ export default function Wallpapers() {
         @media (max-width: 900px) { .masonry-col { gap: 10px; } }
         @media (max-width: 600px) { .masonry-col { gap: 8px; } }
 
-        /* ─── masonry item ─── */
+        /* Sakrashlarni oldini olish va moslashtirish */
         .masonry-item {
           position: relative; border-radius: 16px; overflow: hidden;
           cursor: pointer; background: #0f1219;
-          transform: translateZ(0);
+          transform: translateZ(0); /* Hardware acceleration */
           transition: transform 0.3s, box-shadow 0.3s;
           box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+          width: 100%;
         }
-        .masonry-item:hover {
-          transform: translateY(-3px) scale(1.01);
-          box-shadow: 0 10px 32px rgba(0,0,0,0.65);
+        
+        /* Telefonda qotmasligi uchun hoverni faqat desktopga yoqamiz */
+        @media (hover: hover) and (pointer: fine) {
+          .masonry-item:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 10px 32px rgba(0,0,0,0.65);
+          }
+          .masonry-item:hover .wall-img { transform: scale(1.04); }
+          .masonry-item:hover .img-overlay { opacity: 1; }
         }
+
         @media (max-width: 600px) { .masonry-item { border-radius: 12px; } }
 
-        /* ─── image ─── */
         .wall-img {
-          width: 100%; display: block; border-radius: 16px;
+          width: 100%; height: 100%;
+          object-fit: cover; /* Deterministic bo'lishi uchun */
+          display: block; border-radius: 16px;
           opacity: 0;
           transition: opacity 0.45s ease, transform 0.4s ease;
+          position: absolute; top: 0; left: 0;
         }
         .wall-img.loaded { opacity: 1; }
-        .masonry-item:hover .wall-img { transform: scale(1.04); }
         @media (max-width: 600px) { .wall-img { border-radius: 12px; } }
 
-        /* ─── overlay ─── */
         .img-overlay {
           position: absolute; inset: 0;
           background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 55%);
@@ -340,7 +369,6 @@ export default function Wallpapers() {
           display: flex; flex-direction: column; justify-content: flex-end;
           padding: 12px; pointer-events: none;
         }
-        .masonry-item:hover .img-overlay { opacity: 1; }
         @media (max-width: 768px) { .img-overlay { display: none; } }
 
         .action-btns {
@@ -363,18 +391,17 @@ export default function Wallpapers() {
         .icon-btn:hover   { background: rgba(59,130,246,0.7);  border-color: rgba(59,130,246,0.5); }
         .icon-btn.dl:hover { background: rgba(16,185,129,0.7); border-color: rgba(16,185,129,0.5); }
 
-        /* ─── skeleton ─── */
         .skeleton-item {
           border-radius: 16px;
           background: #0f1219;
           animation: simplePulse 1.5s ease-in-out infinite;
+          width: 100%;
         }
         @keyframes simplePulse {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.5; }
         }
 
-        /* ─── empty state ─── */
         .w-empty {
           text-align: center; color: rgba(255,255,255,0.3);
           padding: 100px 20px;
@@ -388,7 +415,6 @@ export default function Wallpapers() {
         }
         .w-empty p { font-size: 15px; }
 
-        /* ─── modal ─── */
         .modal-overlay {
           position: fixed; inset: 0;
           background: rgba(0,0,0,0.9); z-index: 99999;
@@ -438,7 +464,6 @@ export default function Wallpapers() {
           width: 100%; justify-content: center; flex-wrap: wrap;
         }
 
-        /* buttons — index.js accent renkleri */
         .btn-share, .btn-download {
           border: none; padding: 13px 28px; border-radius: 12px;
           font-weight: 700; font-size: 14px; cursor: pointer;
@@ -471,7 +496,6 @@ export default function Wallpapers() {
           .btn-share, .btn-download { padding: 12px 20px; font-size: 13px; min-width: 120px; }
         }
 
-        /* ─── toast ─── */
         .toast {
           position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
           padding: 12px 22px; border-radius: 30px;
@@ -480,19 +504,10 @@ export default function Wallpapers() {
           animation: toastUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
           white-space: nowrap; max-width: 90vw;
         }
-        .toast-success {
-          background: #10b981; box-shadow: 0 10px 30px rgba(16,185,129,0.4);
-        }
-        .toast-info {
-          background: #eab308; color: #000;
-          box-shadow: 0 10px 30px rgba(234,179,8,0.35);
-        }
-        @keyframes toastUp {
-          from { bottom: 60px; opacity: 0; }
-          to   { bottom: 100px; opacity: 1; }
-        }
+        .toast-success { background: #10b981; box-shadow: 0 10px 30px rgba(16,185,129,0.4); }
+        .toast-info    { background: #eab308; color: #000; box-shadow: 0 10px 30px rgba(234,179,8,0.35); }
+        @keyframes toastUp { from { bottom: 60px; opacity: 0; } to { bottom: 100px; opacity: 1; } }
 
-        /* ─── responsive ─── */
         @media (max-width: 600px) {
           .w-header { padding: 12px 14px; gap: 10px; }
           .w-logo   { display: none; }
@@ -505,8 +520,6 @@ export default function Wallpapers() {
       <div className="bg-vignette" />
 
       <div className="w-container">
-
-        {/* ─── Header ─── */}
         <header className="w-header">
           <div className="w-search-bar">
             <Search size={16} className="w-search-icon" />
@@ -526,7 +539,6 @@ export default function Wallpapers() {
           </div>
         </header>
 
-        {/* ─── Info bar ─── */}
         {!loading && (
           <div className="w-infobar">
             <span className="w-count-label">
@@ -536,7 +548,6 @@ export default function Wallpapers() {
           </div>
         )}
 
-        {/* ─── Empty state ─── */}
         {wallpapers.length === 0 && !loading && (
           <div className="w-empty">
             <div className="w-empty-icon">
@@ -546,13 +557,12 @@ export default function Wallpapers() {
           </div>
         )}
 
-        {/* ─── Masonry grid ─── */}
         {loading ? (
           <div className="masonry-wrapper">
             {Array.from({ length: colCount }).map((_, ci) => (
               <div key={ci} className="masonry-col">
                 {Array.from({ length: 5 }).map((_, i) => {
-                  const heights = ['200px', '270px', '320px', '180px', '290px'];
+                  const heights =['200px', '270px', '320px', '180px', '290px'];
                   return (
                     <div
                       key={i}
@@ -565,57 +575,61 @@ export default function Wallpapers() {
             ))}
           </div>
         ) : (
-          <div className="masonry-wrapper">
-            {columns.map((col, ci) => (
-              <div key={ci} className="masonry-col">
-                {col.map((item, rowIdx) => {
-                  const isLast = ci === lastColIdx && rowIdx === lastRowIdx;
-                  return (
-                    <div
-                      key={item.id}
-                      ref={isLast ? lastElementRef : null}
-                      className="masonry-item"
-                      onClick={() => openModal(item)}
-                    >
-                      <img
-                        src={item.image_url}
-                        alt={item.title || 'Anime Wallpaper'}
-                        className="wall-img"
-                        loading="lazy"
-                        decoding="async"
-                        onLoad={e => e.target.classList.add('loaded')}
-                        onError={e => { e.target.style.display = 'none'; }}
-                      />
-                      <div className="img-overlay">
-                        <div className="action-btns">
-                          <span className="title-text">{item.title || 'Wallpaper'}</span>
-                          <div className="icon-group">
-                            <button
-                              className="icon-btn"
-                              title="Ulashish"
-                              onClick={e => handleShare(e, item)}
-                            >
-                              <Share2 size={14} />
-                            </button>
-                            <button
-                              className="icon-btn dl"
-                              title="Yuklab olish"
-                              onClick={e => handleDownload(e, item)}
-                            >
-                              <Download size={14} />
-                            </button>
+          <>
+            <div className="masonry-wrapper">
+              {columns.map((col, ci) => (
+                <div key={ci} className="masonry-col">
+                  {col.map((item) => {
+                    const dynamicHeight = getDeterministicHeight(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        className="masonry-item"
+                        style={{ height: `${dynamicHeight}px` }} // O'rnini darhol topadi!
+                        onClick={() => openModal(item)}
+                      >
+                        <img
+                          src={item.image_url}
+                          alt={item.title || 'Anime Wallpaper'}
+                          className="wall-img"
+                          loading="lazy"
+                          decoding="async"
+                          onLoad={e => e.target.classList.add('loaded')}
+                          onError={e => { e.target.style.display = 'none'; }}
+                        />
+                        <div className="img-overlay">
+                          <div className="action-btns">
+                            <span className="title-text">{item.title || 'Wallpaper'}</span>
+                            <div className="icon-group">
+                              <button
+                                className="icon-btn"
+                                title="Ulashish"
+                                onClick={e => handleShare(e, item)}
+                              >
+                                <Share2 size={14} />
+                              </button>
+                              <button
+                                className="icon-btn dl"
+                                title="Yuklab olish"
+                                onClick={e => handleDownload(e, item)}
+                              >
+                                <Download size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* Pastki Trigger elementi: Scrollni mukammal ishlashi uchun maxsus qism */}
+            <div ref={observerTarget} style={{ height: '20px', width: '100%' }} />
+          </>
         )}
 
-        {/* ─── Modal ─── */}
         {selectedImage && (
           <div className="modal-overlay" onClick={closeModal}>
             <button className="modal-close" onClick={closeModal}>
@@ -650,7 +664,6 @@ export default function Wallpapers() {
           </div>
         )}
 
-        {/* ─── Toast ─── */}
         {toast.show && (
           <div className={`toast toast-${toast.type}`}>
             <Check size={15} /> {toast.message}
