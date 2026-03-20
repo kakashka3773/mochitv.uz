@@ -137,7 +137,7 @@ export default function MobileNavbar({
           className={`nav-item ${activeTab === 'wall' ? 'active' : ''}`}
           onClick={() => handleNavigation('/wall')}
         >
-          <FaIcons size={22} className="nav-icon" strokeWidth={activeTab === 'wall' ? 2.5 : 2} />
+          <FaIcons size={19} className="nav-icon" strokeWidth={activeTab === 'wall' ? 2.5 : 2} />
           <span className="nav-label">Lavhalar</span>
         </div>
 
